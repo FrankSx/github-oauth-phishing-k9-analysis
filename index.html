@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GitHub OAuth Phishing Campaign Analysis — K-9 Mail Token Theft</title>
+<style>
+:root{--bg:#0d1117;--fg:#e6edf3;--accent:#58a6ff;--warn:#f85149;--card:#161b22;--border:#30363d;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 -apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;}
+header{background:linear-gradient(135deg,#161b22,#1f2937);border-bottom:2px solid var(--warn);padding:2.5rem 1rem;text-align:center}
+header .badge{display:inline-block;background:var(--warn);color:#fff;font-weight:700;font-size:.75rem;letter-spacing:.1em;padding:.25rem .8rem;border-radius:999px;margin-bottom:1rem}
+main{max-width:900px;margin:0 auto;padding:2rem 1.25rem 4rem}
+h1{font-size:2rem;margin:.2em 0;color:#fff}
+h2{color:var(--accent);border-bottom:1px solid var(--border);padding-bottom:.3rem;margin-top:2.2rem}
+h3{color:#79c0ff;margin-top:1.6rem}
+table{border-collapse:collapse;width:100%;margin:1rem 0;font-size:.92rem}
+th,td{border:1px solid var(--border);padding:.5rem .7rem;text-align:left;vertical-align:top}
+th{background:var(--card);color:var(--accent)}
+tr:nth-child(even){background:#11161d}
+code{background:#1f2937;padding:.1em .35em;border-radius:4px;font-size:.88em;color:#ffa657}
+pre{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:1rem;overflow-x:auto}
+pre code{background:none;padding:0;color:#a5d6ff}
+blockquote{border-left:4px solid var(--warn);margin:1rem 0;padding:.5rem 1rem;background:#1f1215;color:#ffb3ae}
+a{color:var(--accent)}
+hr{border:none;border-top:1px solid var(--border);margin:2rem 0}
+footer{text-align:center;color:#8b949e;font-size:.85rem;padding:2rem;border-top:1px solid var(--border)}
+strong{color:#fff}
+</style>
+</head>
+<body>
+<header>
+<div class="badge">HIGH SEVERITY · T1566.002</div>
+<h1>GitHub OAuth Phishing Campaign Analysis</h1>
+<p>K-9 Mail Gmail Authorization Token Theft — frankSx Research Cell, 2026-04-10</p>
+</header>
+<main>
+<h1 id="github-oauth-phishing-campaign-analysis">GitHub OAuth Phishing
+Campaign Analysis</h1>
+<h2 id="k-9-mail-gmail-authorization-token-theft">K-9 Mail Gmail
+Authorization Token Theft</h2>
+<p><strong>Classification:</strong> T1566.002 — Spearphishing Link<br />
+<strong>MITRE ATT&amp;CK:</strong> Credential Access (TA0006) → Forge
+Web Credentials (T1606)<br />
+<strong>Severity:</strong> HIGH<br />
+<strong>Date of Encounter:</strong> 2026-04-10<br />
+<strong>Reporter:</strong> frankSx Research Cell<br />
+<strong>Status:</strong> Documented / IOCs Extracted</p>
+<hr />
+<h2 id="1-executive-summary">1. Executive Summary</h2>
+<p>A targeted OAuth phishing link was delivered via a GitHub issue
+comment on the legitimate <code>openwrt-es/cfe-bcm63xx</code>
+repository. The link leverages the <strong>legitimate K-9 Mail Android
+email client OAuth client ID</strong>
+(<code>262622259280-hhmh92rhklkg2k1tjil69epo0o9a12jm.apps.googleusercontent.com</code>)
+to request full Gmail access (<code>https://mail.google.com/</code>) for
+the target account <code>alexiscosme3@gmail.com</code>.</p>
+<p>This is a <strong>"Legitimate App, Malicious Context"</strong> attack
+— the OAuth consent screen would display "K-9 Mail wants to access your
+Gmail," which appears trustworthy because K-9 Mail is a real,
+widely-used open-source application. Victims who complete the flow grant
+persistent IMAP/SMTP access to their Gmail inbox without ever
+surrendering their Google password.</p>
+<hr />
+<h2 id="2-attack-timeline">2. Attack Timeline</h2>
+<table>
+<thead>
+<tr class="header">
+<th>Timestamp (UTC)</th>
+<th>Event</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>2026-03-30 22:48:37</td>
+<td>GitHub issue #8 created by <code>carmenperez6804-cyber</code> on
+<code>openwrt-es/cfe-bcm63xx</code></td>
+</tr>
+<tr class="even">
+<td>2026-04-10</td>
+<td>Link discovered and reported</td>
+</tr>
+<tr class="odd">
+<td>—</td>
+<td>Issue remains live (as of analysis date)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="3-threat-actor-profile">3. Threat Actor Profile</h2>
+<p><strong>GitHub Account:</strong>
+<code>carmenperez6804-cyber</code><br />
+<strong>User ID:</strong> <code>270039645</code><br />
+<strong>Account Pattern:</strong> <code>[name][numbers][cyber]</code> —
+throwaway naming convention<br />
+<strong>Account Age:</strong> ~6 months (created ~2025-10) —
+purpose-built for phishing campaigns<br />
+<strong>Tactics:</strong> Issue spam on popular open-source repositories
+to maximize visibility<br />
+<strong>Sophistication:</strong> MEDIUM — Uses legitimate OAuth client
+ID, PKCE parameters, and proper Google OAuth flow. Not a crude fake
+login page.</p>
+<hr />
+<h2 id="4-technical-analysis">4. Technical Analysis</h2>
+<h3 id="41-the-oauth-url-decoded">4.1 The OAuth URL (Decoded)</h3>
+<pre><code>https://accounts.google.com/o/oauth2/v2/auth?
+  redirect_uri=com.fsck.k9%3A%2Foauth2redirect
+  &amp;client_id=262622259280-hhmh92rhklkg2k1tjil69epo0o9a12jm.apps.googleusercontent.com
+  &amp;response_type=code
+  &amp;login_hint=alexiscosme3@gmail.com
+  &amp;state=Wl2kUJop6uVy2ZqH0f_bpw
+  &amp;nonce=h4dQ6lRauQVFTOq1qS_atQ
+  &amp;scope=https%3A%2F%2Fmail.google.com%2F
+  &amp;code_challenge=OLrlHx9rd5bgJwYPl0Nnw0EwW8c79yWQkxNqUGQgRis
+  &amp;code_challenge_method=S256</code></pre>
+<h3 id="42-parameter-breakdown">4.2 Parameter Breakdown</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Parameter</th>
+<th>Value</th>
+<th>Analysis</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>client_id</code></td>
+<td><code>262622259280-...</code></td>
+<td><strong>Legitimate K-9 Mail client ID.</strong> Confirmed via Google
+OAuth client registry. This is NOT a fake app — it's the real K-9 Mail
+Android app.</td>
+</tr>
+<tr class="even">
+<td><code>redirect_uri</code></td>
+<td><code>com.fsck.k9://oauth2redirect</code></td>
+<td>Custom URI scheme for Android app deep-linking. If victim completes
+auth on Android, the code is sent to the attacker's K-9 instance.</td>
+</tr>
+<tr class="odd">
+<td><code>response_type</code></td>
+<td><code>code</code></td>
+<td>Authorization Code flow — the code must be exchanged for tokens
+server-side (or app-side).</td>
+</tr>
+<tr class="even">
+<td><code>login_hint</code></td>
+<td><code>alexiscosme3@gmail.com</code></td>
+<td><strong>Pre-filled target account.</strong> Suggests targeted or
+harvested credential. If this is NOT the victim's email, the victim sees
+someone else's account pre-filled — a red flag.</td>
+</tr>
+<tr class="odd">
+<td><code>state</code></td>
+<td><code>Wl2kUJop6uVy2ZqH0f_bpw</code></td>
+<td>22-byte URL-safe base64 CSRF token. Appears cryptographically
+random. Unique per link — allows attacker to correlate clicks.</td>
+</tr>
+<tr class="even">
+<td><code>nonce</code></td>
+<td><code>h4dQ6lRauQVFTOq1qS_atQ</code></td>
+<td>OIDC replay protection token. Properly implemented.</td>
+</tr>
+<tr class="odd">
+<td><code>scope</code></td>
+<td><code>https://mail.google.com/</code></td>
+<td><strong>FULL GMAIL ACCESS.</strong> Read, send, delete, and manage
+ALL emails and labels. Not read-only.</td>
+</tr>
+<tr class="even">
+<td><code>code_challenge</code></td>
+<td><code>OLrlHx9rd5bgJwYPl0Nnw0EwW8c79yWQkxNqUGQgRis</code></td>
+<td>PKCE verifier hash (S256). Properly implemented — prevents auth code
+interception in man-in-the-middle scenarios.</td>
+</tr>
+<tr class="odd">
+<td><code>code_challenge_method</code></td>
+<td><code>S256</code></td>
+<td>SHA-256 hash method for PKCE.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="43-why-this-is-dangerous">4.3 Why This Is Dangerous</h3>
+<p><strong>The OAuth consent screen would show:</strong></p>
+<blockquote>
+<p>"<strong>K-9 Mail</strong> wants to access your Google Account"</p>
+<p>This will allow K-9 Mail to:</p>
+<ul>
+<li>Read, compose, send, and permanently delete all your email from
+Gmail</li>
+</ul>
+</blockquote>
+<p><strong>Victims trust this because:</strong></p>
+<ol type="1">
+<li>K-9 Mail is a legitimate, well-known open-source email client</li>
+<li>The URL is on <code>accounts.google.com</code> — a trusted
+domain</li>
+<li>The consent screen is Google's official UI, not a phishing
+clone</li>
+<li>PKCE and <code>state</code> parameters make the link look
+"secure"</li>
+</ol>
+<p><strong>What the attacker gains:</strong></p>
+<ul>
+<li><strong>Persistent IMAP access</strong> to the victim's Gmail (OAuth
+tokens don't expire on password change)</li>
+<li><strong>Read all emails</strong> — including password resets, 2FA
+codes, banking notifications</li>
+<li><strong>Send emails as the victim</strong> — can pivot to BEC
+(Business Email Compromise)</li>
+<li><strong>Delete emails</strong> — cover tracks, destroy evidence</li>
+<li><strong>No password required</strong> — victim never types their
+Google password</li>
+</ul>
+<hr />
+<h2 id="5-attack-vectors">5. Attack Vectors</h2>
+<h3 id="51-primary-vector-repository-issue-spam">5.1 Primary Vector:
+Repository Issue Spam</h3>
+<ul>
+<li>Attacker creates GitHub issues on <strong>popular open-source
+repositories</strong></li>
+<li>Repositories with high star counts and active maintainers get
+maximum visibility</li>
+<li>The <code>openwrt-es/cfe-bcm63xx</code> repo (router firmware) has a
+technical audience — users who may have Gmail accounts linked to
+infrastructure/credentials</li>
+</ul>
+<h3 id="52-secondary-vectors-hypothesized">5.2 Secondary Vectors
+(Hypothesized)</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Vector</th>
+<th>Likelihood</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Email notification abuse</td>
+<td>MEDIUM</td>
+<td>GitHub sends email notifications for new issues. Victims may click
+from email client without examining the URL.</td>
+</tr>
+<tr class="even">
+<td>Mobile targeting</td>
+<td>HIGH</td>
+<td>The <code>com.fsck.k9://</code> redirect URI strongly suggests the
+attacker expects victims to click from <strong>Android devices</strong>
+where K-9 Mail is installed.</td>
+</tr>
+<tr class="odd">
+<td>Credential stuffing correlation</td>
+<td>LOW</td>
+<td>The <code>login_hint</code> may be from a prior breach list.
+Attacker pre-fills known emails to streamline the attack.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="53-post-compromise-pivot">5.3 Post-Compromise Pivot</h3>
+<p>Once Gmail access is granted:</p>
+<ol type="1">
+<li><strong>Search for crypto wallet recovery phrases</strong> in
+emails</li>
+<li><strong>Reset passwords</strong> on other services using "forgot
+password" + email verification</li>
+<li><strong>Impersonate victim</strong> in email conversations with
+colleagues/family</li>
+<li><strong>Register for new services</strong> using victim's email for
+identity theft</li>
+<li><strong>Sell access</strong> on dark web markets ("Gmail logs with
+full IMAP")</li>
+</ol>
+<hr />
+<h2 id="6-indicators-of-compromise-iocs">6. Indicators of Compromise
+(IOCs)</h2>
+<h3 id="61-network-iocs">6.1 Network IOCs</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Type</th>
+<th>Value</th>
+<th>Context</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>URL</td>
+<td><code>https://accounts.google.com/o/oauth2/v2/auth?...login_hint=alexiscosme3%40gmail.com...</code></td>
+<td>Phishing authorization link</td>
+</tr>
+<tr class="even">
+<td>Client ID</td>
+<td><code>262622259280-hhmh92rhklkg2k1tjil69epo0o9a12jm.apps.googleusercontent.com</code></td>
+<td>K-9 Mail (legitimate, but abused)</td>
+</tr>
+<tr class="odd">
+<td>Redirect URI</td>
+<td><code>com.fsck.k9://oauth2redirect</code></td>
+<td>Target app scheme</td>
+</tr>
+<tr class="even">
+<td>State Token</td>
+<td><code>Wl2kUJop6uVy2ZqH0f_bpw</code></td>
+<td>Session correlation ID</td>
+</tr>
+</tbody>
+</table>
+<h3 id="62-account-iocs">6.2 Account IOCs</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Type</th>
+<th>Value</th>
+<th>Context</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>GitHub Account</td>
+<td><code>carmenperez6804-cyber</code></td>
+<td>Phishing actor</td>
+</tr>
+<tr class="even">
+<td>GitHub User ID</td>
+<td><code>270039645</code></td>
+<td>Unique identifier</td>
+</tr>
+<tr class="odd">
+<td>Target Email</td>
+<td><code>alexiscosme3@gmail.com</code></td>
+<td>Pre-filled login hint</td>
+</tr>
+<tr class="even">
+<td>Repository</td>
+<td><code>openwrt-es/cfe-bcm63xx</code></td>
+<td>Issue #8 hosting the link</td>
+</tr>
+</tbody>
+</table>
+<h3 id="63-behavioral-iocs">6.3 Behavioral IOCs</h3>
+<ul>
+<li>OAuth authorization for K-9 Mail from an <strong>unexpected
+device/location</strong></li>
+<li>Gmail access logs showing <strong>IMAP connections</strong> from
+unknown IPs</li>
+<li>New <strong>"K-9 Mail" entry</strong> in Google Account → Security →
+Third-party apps</li>
+<li>Outgoing emails in Sent folder that the user didn't send</li>
+</ul>
+<hr />
+<h2 id="7-defensive-recommendations">7. Defensive Recommendations</h2>
+<h3 id="71-for-individual-users">7.1 For Individual Users</h3>
+<ol type="1">
+<li><strong>Never click OAuth links sent via unsolicited
+messages</strong> — even on trusted platforms like GitHub</li>
+<li><strong>Verify the <code>login_hint</code></strong> — if it shows
+someone else's email, it's targeting that account</li>
+<li><strong>Check Google Account permissions regularly:</strong>
+<ul>
+<li>Navigate to: <a
+href="https://myaccount.google.com/permissions">https://myaccount.google.com/permissions</a></li>
+<li>Revoke any "K-9 Mail" or suspicious third-party app access</li>
+</ul></li>
+<li><strong>Enable Google Advanced Protection</strong> if high-risk
+(journalists, activists, admins)</li>
+<li><strong>Review Gmail access logs:</strong> Google Account → Security
+→ Recent security activity</li>
+</ol>
+<h3 id="72-for-github-users--maintainers">7.2 For GitHub Users &amp;
+Maintainers</h3>
+<ol type="1">
+<li><strong>Report the account:</strong> <a
+href="https://github.com/contact/report-abuse">https://github.com/contact/report-abuse</a></li>
+<li><strong>Lock issue conversations</strong> on spam issues to prevent
+further exposure</li>
+<li><strong>Enable issue templates</strong> requiring structured input —
+reduces drive-by spam</li>
+<li><strong>Use GitHub's "Mark as spam"</strong> feature on issues —
+trains their detection</li>
+<li><strong>Consider requiring approval</strong> for first-time
+contributors' issues</li>
+</ol>
+<h3 id="73-for-security-teams">7.3 For Security Teams</h3>
+<ol type="1">
+<li><strong>Hunt for the client ID</strong> in proxy logs — any internal
+user authorizing K-9 Mail unexpectedly</li>
+<li><strong>Monitor for <code>accounts.google.com</code> URLs</strong>
+with <code>com.fsck.k9</code> redirect URIs in email gateways</li>
+<li><strong>Check Google Workspace audit logs</strong> for OAuth token
+grants to K-9 Mail</li>
+<li><strong>Block the GitHub account</strong> in corporate SSO if
+employees use GitHub Enterprise</li>
+</ol>
+<h3 id="74-for-k-9-mail--google">7.4 For K-9 Mail / Google</h3>
+<ol type="1">
+<li><strong>K-9 Mail:</strong> Consider implementing <strong>dynamic
+redirect URI validation</strong> tied to device registration</li>
+<li><strong>Google:</strong> Flag OAuth flows where
+<code>login_hint</code> doesn't match the authenticated user's primary
+email</li>
+<li><strong>Both:</strong> Implement <strong>risk-based step-up
+authentication</strong> for high-scope OAuth grants (full Gmail
+access)</li>
+</ol>
+<hr />
+<h2 id="8-detection-queries">8. Detection Queries</h2>
+<h3 id="81-proxysiem-splunksigma">8.1 Proxy/SIEM (Splunk/Sigma)</h3>
+<pre><code>title: K-9 Mail OAuth Phishing Detection
+logsource:
+  category: proxy
+detection:
+  selection:
+    - c-uri|contains: 'accounts.google.com/o/oauth2/v2/auth'
+    - c-uri|contains: 'com.fsck.k9'
+    - c-uri|contains: 'mail.google.com'
+  condition: selection
+falsepositives:
+  - Legitimate K-9 Mail OAuth setup on Android
+level: medium</code></pre>
+<h3 id="82-google-workspace-admin-gcp-logs">8.2 Google Workspace Admin
+(GCP Logs)</h3>
+<pre><code>SELECT *
+FROM `project-id.audit_logs.cloudaudit_googleapis_com_data_access`
+WHERE protoPayload.serviceData.oauth2Approval.applicationId =
+  '262622259280-hhmh92rhklkg2k1tjil69epo0o9a12jm.apps.googleusercontent.com'
+  AND TIMESTAMP_TRUNC(timestamp, DAY) = TIMESTAMP("2026-04-10")</code></pre>
+<hr />
+<h2 id="9-lessons-learned">9. Lessons Learned</h2>
+<ol type="1">
+<li><p><strong>Legitimate apps can be weaponized.</strong> The attacker
+didn't create a fake app — they abused a real one's OAuth client ID.
+This bypasses user skepticism.</p></li>
+<li><p><strong>GitHub issues are a trusted delivery mechanism.</strong>
+Users expect GitHub to be safe. Issue spam on legitimate repos exploits
+this trust.</p></li>
+<li><p><strong>PKCE doesn't prevent phishing.</strong> PKCE protects
+against auth code interception (MITM), not social engineering. The
+attacker IS the legitimate recipient of the auth code.</p></li>
+<li><p><strong>OAuth tokens are more dangerous than passwords.</strong>
+A stolen OAuth token for Gmail persists even after password changes and
+bypasses 2FA for IMAP access.</p></li>
+<li><p><strong>Pre-filled <code>login_hint</code> is a targeting
+signal.</strong> It reveals the attacker's reconnaissance — they likely
+harvested this email from a previous breach or public source.</p></li>
+</ol>
+<hr />
+<h2 id="10-appendix-full-decoded-url">10. Appendix: Full Decoded
+URL</h2>
+<pre><code>Base URL:    https://accounts.google.com/o/oauth2/v2/auth
+Redirect:    com.fsck.k9://oauth2redirect
+Client ID:   262622259280-hhmh92rhklkg2k1tjil69epo0o9a12jm.apps.googleusercontent.com
+Response:    code
+Login Hint:  alexiscosme3@gmail.com
+State:       Wl2kUJop6uVy2ZqH0f_bpw (16 bytes random, base64url)
+Nonce:       h4dQ6lRauQVFTOq1qS_atQ (16 bytes random, base64url)
+Scope:       https://mail.google.com/ (FULL Gmail access)
+PKCE Challenge: OLrlHx9rd5bgJwYPl0Nnw0EwW8c79yWQkxNqUGQgRis (S256)</code></pre>
+<p><strong>Entropy Analysis:</strong></p>
+<ul>
+<li><code>state</code>: ~128 bits — cryptographically sound</li>
+<li><code>nonce</code>: ~128 bits — cryptographically sound</li>
+<li><code>code_challenge</code>: ~256 bits — proper PKCE
+implementation</li>
+</ul>
+<p>The attacker implemented the OAuth flow <strong>correctly from a
+security standpoint</strong> — which makes the phishing more convincing
+and harder to detect via technical anomalies.</p>
+<hr />
+<h2 id="11-references">11. References</h2>
+<ul>
+<li><a href="https://tools.ietf.org/html/rfc6749">RFC 6749 — OAuth 2.0
+Authorization Framework</a></li>
+<li><a href="https://tools.ietf.org/html/rfc7636">RFC 7636 — Proof Key
+for Code Exchange (PKCE)</a></li>
+<li><a
+href="https://developers.google.com/identity/protocols/oauth2/native-app">Google
+OAuth 2.0 for Mobile &amp; Desktop Apps</a></li>
+<li><a href="https://attack.mitre.org/techniques/T1566/002/">MITRE
+ATT&amp;CK T1566.002 — Spearphishing Link</a></li>
+<li><a href="https://github.com/thunderbird/thunderbird-android">K-9
+Mail GitHub Repository</a></li>
+</ul>
+<hr />
+<p><em>Document generated by frankSx Research Cell — 13th Hour
+Protocol</em><br />
+<em>Classification: UNCLASSIFIED — Share for defensive purposes</em></p>
+
+</main>
+<footer>Document generated by frankSx Research Cell — 13th Hour Protocol · UNCLASSIFIED — Share for defensive purposes</footer>
+</body>
+</html>
